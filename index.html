@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">會員登入與註冊</title>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <!-- 引入Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- 引入Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      background-color: #f5f5f5;
+      font-family: Arial, sans-serif;
+    }
+
+    .container {
+      text-align: center;
+      padding: 20px;
+      background-color: #f2b5fa;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+      width: 100%;
+      max-width: 600px;
+      box-sizing: border-box;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    #authButtons {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+
+    button {
+      margin: 10px 0;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    button#loginBtn, button#registerBtn {
+      background-color: #4caf50;
+      color: white;
+    }
+
+    button#logoutBtn, button#saveNoteBtn {
+      background-color: #ffa500;
+      color: white;
+    }
+
+    button:hover {
+      background-color: #ddd;
+    }
+
+    #userInfo {
+      margin-top: 20px;
+      display: none;
+    }
+
+    #noteSection {
+      margin-top: 30px;
+      display: none;
+      text-align: left; /* 靠左對齊 */
+    }
+
+    textarea {
+      width: 100%;
+      padding: 10px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    ul {
+      list-style-type: none;
+      padding: 0;
+      margin-top: 10px;
+    }
+
+    ul li {
+      background: #f9f9f9;
+      margin: 5px 0;
+      padding: 10px;
+      border-radius: 5px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .edit-btn, .delete-btn {
+      background-color: #007bff;
+      color: white;
+      padding: 5px 10px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+
+    .delete-btn {
+      background-color: #dc3545;
+    }
+
+    .edit-btn:hover, .delete-btn:hover {
+      background-color: #0056b3;
+    }
+
+    /* 儲存筆記按鈕置中 */
+    #saveNoteBtnContainer {
+      display: flex;
+      justify-content: center;
+      margin-top: 10px;
+    }
+
+    /* 編輯筆記的標題與內容 */
+    .note-edit-container {
+      margin-bottom: 20px;
+    }
+
+    .note-edit-container input, .note-edit-container textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 5px;
+      border: 1px solid #ddd;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1 id="mainTitle">會員登入與註冊</h1>
+
+    <!-- 註冊和登入按鈕 -->
+    <div id="authButtons">
+      <button id="registerBtn" class="btn btn-success">註冊</button>
+      <button id="loginBtn" class="btn btn-success">登入</button>
+    </div>
+
+    <!-- 會員資訊與登出按鈕 -->
+    <div id="userInfoSection" style="display: none;">
+      <button id="userInfoBtn" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#userInfoModal">
+        會員資訊
+      </button>
+      <button id="logoutBtn" class="btn btn-warning" onclick="signOut()">登出</button>
+    </div>
+
+    <!-- 會員資訊 Modal -->
+    <div class="modal fade" id="userInfoModal" tabindex="-1" aria-labelledby="userInfoModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="userInfoModalLabel">使用者資訊</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <img id="userPhoto" alt="使用者照片" width="100" class="rounded-circle mb-3">
+            <p id="userName">名稱: </p>
+            <p id="userEmail">電子郵件: </p>
+            <p id="lastLogin">最後登入: </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 筆記區域 -->
+    <div id="noteSection" style="display: none;">
+      <h2>筆記功能</h2>
+      <div class="note-edit-container">
+        <input type="text" id="noteTitle" placeholder="輸入筆記標題..." />
+        <textarea id="noteInput" rows="5" placeholder="輸入你的筆記..."></textarea>
+      </div>
+      <div id="saveNoteBtnContainer">
+        <button id="saveNoteBtn" class="btn btn-warning" onclick="saveNote()">儲存筆記</button>
+      </div>
+      <ul id="notesList"></ul>
+    </div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDQF04btvgEfKe8_qvUhtSHODDoG5DwnEs",
+      authDomain: "index-b8d66.firebaseapp.com",
+      databaseURL: "https://index-b8d66-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "index-b8d66",
+      storageBucket: "index-b8d66.firebasestorage.app",
+      messagingSenderId: "833317052451",
+      appId: "1:833317052451:web:8fc90c272ee9d16afc9196"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const database = firebase.database();
+
+    // 註冊按鈕
+    document.getElementById("registerBtn").addEventListener("click", registerUser);
+
+    // 登入按鈕
+    document.getElementById("loginBtn").addEventListener("click", loginUser);
+
+    // 註冊功能
+    function registerUser() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .then((result) => {
+          const user = result.user;
+
+          // 檢查是否已註冊
+          const userRef = database.ref('users/' + user.uid);
+          userRef.once('value').then((snapshot) => {
+            if (snapshot.exists()) {
+              alert("此帳戶已註冊！");
+            } else {
+              const userData = {
+                name: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                lastLogin: new Date().toLocaleString(),
+              };
+              userRef.set(userData);
+              alert("註冊成功！");
+            }
+          });
+
+        })
+        .catch((error) => {
+          console.error("註冊錯誤:", error);
+        });
+    }
+
+    // 登入功能
+    function loginUser() {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      auth.signInWithPopup(provider)
+        .then((result) => {
+          const user = result.user;
+          const userRef = database.ref('users/' + user.uid);
+          userRef.once('value').then((snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+              document.getElementById("userName").textContent = `名稱: ${data.name}`;
+              document.getElementById("userEmail").textContent = `電子郵件: ${data.email}`;
+              document.getElementById("lastLogin").textContent = `最後登入: ${data.lastLogin}`;
+              document.getElementById("userPhoto").src = data.photoURL;
+
+              // 顯示登入後介面
+              document.getElementById("authButtons").style.display = "none";
+              document.getElementById("userInfoSection").style.display = "inline-block";
+              document.getElementById("noteSection").style.display = "block";
+              document.getElementById("mainTitle").textContent = "會員系統";
+              document.getElementById("pageTitle").textContent = "會員系統";
+
+              // 立即載入筆記
+              loadNotes();
+            }
+          });
+        })
+        .catch((error) => {
+          console.error("登入錯誤:", error);
+        });
+    }
+
+    // 登出功能
+    function signOut() {
+      auth.signOut()
+        .then(() => {
+          alert("成功登出！");
+          document.getElementById("authButtons").style.display = "inline-block";
+          document.getElementById("userInfoSection").style.display = "none";
+          document.getElementById("noteSection").style.display = "none";
+          document.getElementById("mainTitle").textContent = "會員登入與註冊";
+          document.getElementById("pageTitle").textContent = "會員登入與註冊";
+        })
+        .catch((error) => {
+          console.error("登出錯誤:", error);
+        });
+    }
+
+    // 儲存筆記功能
+    function saveNote() {
+      const noteText = document.getElementById("noteInput").value;
+      const noteTitle = document.getElementById("noteTitle").value;
+      if (noteText.trim() === "" || noteTitle.trim() === "") {
+        alert("請輸入標題與內容！");
+        return;
+      }
+      const userId = auth.currentUser.uid;
+      const notesRef = database.ref('notes/' + userId);
+      notesRef.push({ title: noteTitle, content: noteText, timestamp: new Date().toISOString() });
+      alert("筆記已儲存！");
+      loadNotes(); // 重新載入筆記
+    }
+
+    // 載入筆記
+    function loadNotes() {
+      const userId = auth.currentUser.uid;
+      const notesRef = database.ref('notes/' + userId);
+      notesRef.once('value', (snapshot) => {
+        const notes = snapshot.val();
+        const notesList = document.getElementById("notesList");
+        notesList.innerHTML = ""; // 清空筆記列表
+        if (notes) {
+          Object.entries(notes).forEach(([id, note]) => {
+            const li = document.createElement("li");
+            li.innerHTML = `
+              <span><strong>${note.title}</strong></span><br>
+              <span>${note.content}</span><br>
+              <button class="edit-btn" onclick="editNote('${id}', '${note.title}', '${note.content}')">編輯</button>
+              <button class="delete-btn" onclick="deleteNote('${id}')">刪除</button>
+            `;
+            notesList.appendChild(li);
+          });
+        }
+      });
+    }
+
+    // 編輯筆記
+    function editNote(id, title, content) {
+      const newTitle = prompt("編輯筆記標題", title);
+      const newContent = prompt("編輯筆記內容", content);
+      if (newTitle !== null && newContent !== null && newTitle.trim() !== "" && newContent.trim() !== "") {
+        const userId = auth.currentUser.uid;
+        const notesRef = database.ref('notes/' + userId + '/' + id);
+        notesRef.update({ title: newTitle, content: newContent });
+        loadNotes(); // 重新載入筆記
+      }
+    }
+
+    // 刪除筆記
+    function deleteNote(id) {
+      const userId = auth.currentUser.uid;
+      const notesRef = database.ref('notes/' + userId + '/' + id);
+      notesRef.remove()
+        .then(() => {
+          alert("筆記已刪除！");
+          loadNotes(); // 重新載入筆記
+        })
+        .catch((error) => {
+          console.error("刪除筆記錯誤:", error);
+        });
+    }
+  </script>
+</body>
+</html>
